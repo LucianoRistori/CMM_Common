@@ -1,28 +1,13 @@
-//------------------------------------------------------------------------------
-// File: Points.cpp
-//
-// Description:
-//   Utility function to read 3D (or N-dimensional) points from a text or CSV file.
-//   Each line is expected to contain at least 'n' numerical values.
-//   Lines with fewer than 'n' values are skipped with a warning.
-//   Both space- and comma-separated files are supported.
-//
-// Behavior:
-//   - On missing or unreadable file → exits with error message.
-//   - On malformed lines → prints warning and skips the line.
-//   - Returns a vector<Point> with 'n' coordinates per point.
-//
-//------------------------------------------------------------------------------
-// more info in Points.h
-//------------------------------------------------------------------------------
-
 #include "Points.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <vector>
+#include <string>
+#include <cctype>
 
-std::vector<Point> readPoints(const std::string &filename, int n) {
+std::vector<Point> readPoints(const std::string &filename, int nExpected) {
     std::ifstream infile(filename);
     if (!infile.is_open()) {
         std::cerr << "Error: cannot open file " << filename << std::endl;
@@ -32,48 +17,54 @@ std::vector<Point> readPoints(const std::string &filename, int n) {
     std::vector<Point> points;
     std::string line;
     int lineNum = 0;
-    
-	// begin loop that reads lines///////////////////////
-	
+    int index = 0;  // sequential internal ID
+
     while (std::getline(infile, line)) {
         ++lineNum;
 
-        // Replace commas with spaces to allow reading 
-        //both CSV and space-separated formats.
-        
+        // Replace commas with spaces (allow CSV or space-delimited)
         for (char &c : line) {
             if (c == ',') c = ' ';
         }
 
+        // Skip empty or comment lines
+        if (line.empty() || line[0] == '#') continue;
+
         std::istringstream iss(line);
-        std::vector<double> numbers;
+        std::string label;
+        iss >> label;  // skip first field (label)
+
+        // Read numeric coordinates
+        std::vector<double> coords;
         double val;
+        while (iss >> val) coords.push_back(val);
 
-        while (iss >> val) {
-            numbers.push_back(val);
-        }
-        
-        // Skip lines that do not have enough numbers (e.g. missing coordinates).
-		// This avoids exceptions and allows the program to continue with valid data only.
-
-        if (numbers.size() < static_cast<size_t>(n)) {
-            std::cerr << "Warning: line " << lineNum
-                      << " has only " << numbers.size()
-                      << " numbers, expected " << n << ". Skipping." << std::endl;
+        if ((int)coords.size() < nExpected) {
+            std::cout << "Warning: line " << lineNum
+                      << " has only " << coords.size()
+                      << " numeric fields (expected at least "
+                      << nExpected << "). Skipped.\n";
             continue;
         }
-        
-        // Create a Point object with n coordinates and copy the parsed values into it.
-        Point p(n);
-        for (int i = 0; i < n; ++i) {
-            p.coords[i] = numbers[i];
+
+        // Create Point and fill only the first nExpected coordinates
+        Point p;
+        p.id = index++;
+        for (int i = 0; i < nExpected; ++i) {
+            p.coords[i] = coords[i];
         }
+
         points.push_back(p);
-        
-    }// end loop on lines
-    
-    // Return the vector of successfully read points.
-	// If no valid lines were found, the vector will be empty.
+    }
+
+    infile.close();
+
+    if (points.empty()) {
+        std::cerr << "Error: no valid points read from file " << filename << std::endl;
+    } else {
+        std::cout << "Read " << points.size()
+                  << " valid points from " << filename << std::endl;
+    }
 
     return points;
 }

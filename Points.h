@@ -1,87 +1,53 @@
 #ifndef POINTS_H
 #define POINTS_H
-/*
- * Points.h
- *
- * Provides the Point struct and readPoints() function for reading N-dimensional coordinates
- * from a text or CSV file. Designed to be reusable in multiple programs.
- *
- * -------------------------------------------
- * Workflow / Usage:
- *
- * 1. Include this header and compile with Points.cpp:
- *
- *      #include "Points.h"
- *      g++ -std=c++17 -O2 -Wall main.cpp Points.cpp `root-config --cflags --libs` -o myProgram
- *
- * 2. Read points from a file:
- *
- *      int n = 3; // number of coordinates per point
- *      std::vector<Point> points = readPoints("points.csv", n);
- *
- * 3. Process points:
- *
- *      for (const auto& p : points) {
- *          for (int i = 0; i < n; ++i) {
- *              std::cout << p.coords[i] << " ";
- *          }
- *          std::cout << std::endl;
- *      }
- *
- * 4. Optional: create histograms with ROOT (1D per coordinate) or a 2D scatter plot:
- *
- *      // Using makeHists.cpp workflow:
- *      ./makeHists points.csv 3
- *
- *      This will:
- *          - Read valid points from the file
- *          - Create one TH1D histogram per coordinate
- *          - Create a TGraph of coords[1] vs coords[0]
- *          - Save all objects to output.root
- *          - Display each plot in its own GUI window
- *
- * -------------------------------------------
- * File format:
- *
- *  - Text or CSV file with one point per line
- *  - Coordinates separated by spaces or commas
- *  - Lines with fewer numbers than expected (n) are skipped
- *
- * Example file (3 coordinates per line):
- *
- *   1.23, 4.56, 7.89
- *   2.34, 5.67, 8.90
- *   3.45, 6.78, 9.01
- *
- * Example minimal C++ program:
- *
- *   #include "Points.h"
- *   #include <iostream>
- *
- *   int main() {
- *       int n = 3;
- *       auto points = readPoints("points.csv", n);
- *       for (const auto& p : points) {
- *           for (int i = 0; i < n; ++i) std::cout << p.coords[i] << " ";
- *           std::cout << std::endl;
- *       }
- *   }
- *
- */
 
 
-
+//------------------------------------------------------------------------------
+// Read a set of points from an ASCII file.
+//
+// Each line of the input file must contain:
+//     <label> <coord1> <coord2> ... <coordN>
+//
+// The first field ("label") can be numeric (e.g. 1, 2, 3) or alphanumeric
+// (e.g. P1, P2, P3). It is ignored during parsing.
+//
+// Parameters:
+//   filename    - name of the input text file
+//   nExpected   - number of coordinate fields to read from each line
+//                 (e.g. 3 for X,Y,Z; 4 if an additional value follows).
+//
+// Behavior:
+//   • Lines starting with '#' or empty lines are ignored.
+//   • Commas are treated as spaces (CSV compatible).
+//   • Lines with fewer than nExpected numeric values are skipped with a warning.
+//   • Lines with extra numbers are accepted but only the first nExpected
+//     coordinates are stored.
+//   • The first field (label) is ignored; each Point receives an internal
+//     sequential ID starting from 0.
+//   • Returns a vector of valid Point structures.
+//
+// Example input:
+//     P1 12.345 67.890 0.123
+//     P2 12.346 67.891 0.122
+//
+// Example call:
+//     auto points = readPoints("data.txt", 3);
+//
+// Example output (2 valid points read):
+//     Warning: line 3 has only 2 numeric fields (expected at least 3). Skipped.
+//     Read 2 valid points from data.txt
+//------------------------------------------------------------------------------
 #include <string>
 #include <vector>
 
-// A simple struct to hold one point with n coordinates
+//------------------------------------------------------------------------------
+// Structure representing a single measurement point
+//------------------------------------------------------------------------------
 struct Point {
-    std::vector<double> coords;
-    Point(int n) : coords(n, 0.0) {}
+    int id = 0;                  // Sequential internal ID assigned by readPoints()
+    double coords[10] = {0.0};   // Coordinate array (size should be >= nExpected)
 };
 
-// Reads a file of points, each line containing n coordinates.
-// Returns a vector of Point objects.
-std::vector<Point> readPoints(const std::string &filename, int n);
+std::vector<Point> readPoints(const std::string &filename, int nExpected);
 
 #endif // POINTS_H
