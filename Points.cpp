@@ -3,68 +3,49 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
-#include <vector>
-#include <string>
-#include <cctype>
 
-std::vector<Point> readPoints(const std::string &filename, int nExpected) {
-    std::ifstream infile(filename);
+using namespace std;
+
+vector<Point> readPoints(const string &filename, int nExpected) {
+    ifstream infile(filename);
     if (!infile.is_open()) {
-        std::cerr << "Error: cannot open file " << filename << std::endl;
+        cerr << "Error: cannot open file " << filename << endl;
         exit(1);
     }
 
-    std::vector<Point> points;
-    std::string line;
+    vector<Point> points;
+    string line;
     int lineNum = 0;
-    int index = 0;  // sequential internal ID
 
-    while (std::getline(infile, line)) {
+    while (getline(infile, line)) {
         ++lineNum;
+        if (line.empty()) continue;
 
-        // Replace commas with spaces (allow CSV or space-delimited)
-        for (char &c : line) {
+        // Replace commas with spaces for CSV files
+        for (char &c : line)
             if (c == ',') c = ' ';
-        }
 
-        // Skip empty or comment lines
-        if (line.empty() || line[0] == '#') continue;
-
-        std::istringstream iss(line);
-        std::string label;
-        iss >> label;  // skip first field (label)
-
-        // Read numeric coordinates
-        std::vector<double> coords;
-        double val;
-        while (iss >> val) coords.push_back(val);
-
-        if ((int)coords.size() < nExpected) {
-            std::cout << "Warning: line " << lineNum
-                      << " has only " << coords.size()
-                      << " numeric fields (expected at least "
-                      << nExpected << "). Skipped.\n";
-            continue;
-        }
-
-        // Create Point and fill only the first nExpected coordinates
+        istringstream iss(line);
         Point p;
-        p.id = index++;
-        for (int i = 0; i < nExpected; ++i) {
-            p.coords[i] = coords[i];
+        p.label = "";
+
+        // Try to read label + 3 numbers
+        if (!(iss >> p.label >> p.coords[0] >> p.coords[1] >> p.coords[2])) {
+            // Retry without label (3 numeric columns)
+            iss.clear();
+            iss.str(line);
+            if (!(iss >> p.coords[0] >> p.coords[1] >> p.coords[2])) {
+                cerr << "Warning: skipping invalid line " << lineNum << endl;
+                continue;
+            }
         }
 
         points.push_back(p);
     }
 
-    infile.close();
-
-    if (points.empty()) {
-        std::cerr << "Error: no valid points read from file " << filename << std::endl;
-    } else {
-        std::cout << "Read " << points.size()
-                  << " valid points from " << filename << std::endl;
-    }
+    if (nExpected > 0 && (int)points.size() != nExpected)
+        cerr << "Warning: expected " << nExpected
+             << " points but read " << points.size() << endl;
 
     return points;
 }

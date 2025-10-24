@@ -1,53 +1,57 @@
+//======================================================================
+// File: Points.h
+// Author: Luciano Ristori
+// Created: original version (FlatnessScan / CompareScan common module)
+// Updated: October 2025
+//
+// Description:
+//   Defines the Point structure and the readPoints() function used by
+//   FlatnessScan, CompareScan, OptimizePath, and other CMM data tools.
+//
+//   Each Point represents a 3D measurement (X, Y, Z) optionally labeled
+//   by an identifying string (e.g. P1, A03, etc.). The label field is
+//   preserved when present in the input file but left empty otherwise.
+//
+//   The readPoints() function reads a list of points from a text or CSV
+//   file. It supports the following formats:
+//
+//       <label> <X> <Y> <Z>
+//       <X> <Y> <Z>
+//       <label>,<X>,<Y>,<Z>
+//       <X>,<Y>,<Z>
+//
+//   Lines that cannot be parsed are skipped with a warning.
+//   This version is backward compatible with previous releases.
+//
+// Revision history:
+//   v1.2.0  (Oct 2025)  Added 'label' field to Point struct.
+//                        Updated readPoints() to handle labels and CSV.
+//======================================================================
+
 #ifndef POINTS_H
 #define POINTS_H
 
-
-//------------------------------------------------------------------------------
-// Read a set of points from an ASCII file.
-//
-// Each line of the input file must contain:
-//     <label> <coord1> <coord2> ... <coordN>
-//
-// The first field ("label") can be numeric (e.g. 1, 2, 3) or alphanumeric
-// (e.g. P1, P2, P3). It is ignored during parsing.
-//
-// Parameters:
-//   filename    - name of the input text file
-//   nExpected   - number of coordinate fields to read from each line
-//                 (e.g. 3 for X,Y,Z; 4 if an additional value follows).
-//
-// Behavior:
-//   • Lines starting with '#' or empty lines are ignored.
-//   • Commas are treated as spaces (CSV compatible).
-//   • Lines with fewer than nExpected numeric values are skipped with a warning.
-//   • Lines with extra numbers are accepted but only the first nExpected
-//     coordinates are stored.
-//   • The first field (label) is ignored; each Point receives an internal
-//     sequential ID starting from 0.
-//   • Returns a vector of valid Point structures.
-//
-// Example input:
-//     P1 12.345 67.890 0.123
-//     P2 12.346 67.891 0.122
-//
-// Example call:
-//     auto points = readPoints("data.txt", 3);
-//
-// Example output (2 valid points read):
-//     Warning: line 3 has only 2 numeric fields (expected at least 3). Skipped.
-//     Read 2 valid points from data.txt
-//------------------------------------------------------------------------------
 #include <string>
 #include <vector>
 
-//------------------------------------------------------------------------------
-// Structure representing a single measurement point
-//------------------------------------------------------------------------------
+//---------------------------------------------------------------
+// Basic data structure for a measured 3D point.
+//---------------------------------------------------------------
 struct Point {
-    int id = 0;                  // Sequential internal ID assigned by readPoints()
-    double coords[10] = {0.0};   // Coordinate array (size should be >= nExpected)
+    std::string label;   // optional point label (empty if not present)
+    double coords[3];    // X, Y, Z coordinates
 };
 
-std::vector<Point> readPoints(const std::string &filename, int nExpected);
+//---------------------------------------------------------------
+// Read list of points from file (CSV or space-separated).
+// Returns vector of valid points. Lines that cannot be parsed
+// are skipped with a warning.
+//
+// Parameters:
+//   filename   → input file name
+//   nExpected  → optional expected number of points (0 = ignore)
+//
+//---------------------------------------------------------------
+std::vector<Point> readPoints(const std::string& filename, int nExpected = 0);
 
 #endif // POINTS_H
