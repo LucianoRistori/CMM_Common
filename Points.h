@@ -2,31 +2,41 @@
 // File: Points.h
 // Author: Luciano Ristori
 // Created: original version (FlatnessScan / CompareScan common module)
-// Updated: October 2025
+// Updated: December 2025 (v2.0)
 //
 // Description:
 //   Defines the Point structure and the readPoints() function used by
-//   FlatnessScan, CompareScan, OptimizePath, and other CMM data tools.
+//   FlatnessScan, CompareScan, OptimizePath, AddDisplacedPoints, and other
+//   CMM data tools.
 //
-//   Each Point represents a 3D measurement (X, Y, Z) optionally labeled
-//   by an identifying string (e.g. P1, A03, etc.). The label field is
-//   preserved when present in the input file but left empty otherwise.
+//   A Point consists of:
+//       label  → mandatory non-numeric identifier (string)
+//       coords → a vector<double> of N coordinates, where N is specified
+//                 by the caller via readPoints(filename, nExpected)
 //
-//   The readPoints() function reads a list of points from a text or CSV
-//   file. It supports the following formats:
+//   The readPoints() function enforces the following rules:
 //
-//       <label> <X> <Y> <Z>
-//       <X> <Y> <Z>
-//       <label>,<X>,<Y>,<Z>
-//       <X>,<Y>,<Z>
+//     • First token MUST be a non-numeric label
+//         - If the first token can be parsed as a number, the line is rejected.
 //
-//   Lines that cannot be parsed are skipped with a warning.
-//   This version is backward compatible with previous releases.
+//     • After the label, exactly nExpected numeric coordinates are required.
+//         - If fewer are present → skip line with warning.
+//         - If more are present  → ignore extras.
 //
-// Revision history:
-//   v1.2.0  (Oct 2025)  Added 'label' field to Point struct.
-//                        Updated readPoints() to handle labels and CSV.
-//======================================================================
+//     • Commas are treated as spaces (CSV compatibility).
+//
+//     • Empty / blank lines produce warnings and are skipped.
+//
+//     • Warnings use ROOT-style formatting:
+//         *** Warning in readPoints(): <file> line <N>: <reason>
+//         --> <offending line content>
+//
+//     • Trailing garbage after the coordinates is allowed and ignored.
+//
+//     • All warnings are printed to std::cerr.
+//       The parser never aborts; it continues through the file.
+//
+//----------------------------------------------------------------------
 
 #ifndef POINTS_H
 #define POINTS_H
@@ -35,23 +45,28 @@
 #include <vector>
 
 //---------------------------------------------------------------
-// Basic data structure for a measured 3D point.
+// Basic data structure for a measured point with arbitrary
+// number of coordinates.
 //---------------------------------------------------------------
 struct Point {
-    std::string label;   // optional point label (empty if not present)
-    double coords[3];    // X, Y, Z coordinates
+    std::string label;           // mandatory non-numeric point label
+    std::vector<double> coords;  // variable-length coordinate list
 };
 
 //---------------------------------------------------------------
-// Read list of points from file (CSV or space-separated).
-// Returns vector of valid points. Lines that cannot be parsed
-// are skipped with a warning.
+// Read points from text or CSV file.
 //
 // Parameters:
-//   filename   → input file name
-//   nExpected  → optional expected number of points (0 = ignore)
+//   filename   → name of the input file
+//   nExpected  → number of coordinates expected per point
+//                (must be ≥ 1)
+//
+// Returns:
+//   vector<Point> containing all valid points.
+//   Invalid lines are skipped with ROOT-style warnings.
 //
 //---------------------------------------------------------------
-std::vector<Point> readPoints(const std::string& filename, int nExpected = 0);
+std::vector<Point> readPoints(const std::string& filename,
+                              int nExpected);
 
 #endif // POINTS_H
