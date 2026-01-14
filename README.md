@@ -1,116 +1,139 @@
-# common
+# common — Shared CMM Utilities
 
-Shared C++ utilities for all CMM-related analysis programs (FlatnessScan, CompareScan, AddDisplacedPoints, MakeHexGrid, PlotPoints, OptimizePath, etc.).  
-This repository provides a stable, centralized implementation of the **Point** data structure and the **readPoints()** function used across all geometry and measurement tools.
+This repository provides shared C++ utilities used across multiple
+Coordinate Measurement Machine (CMM) analysis tools (e.g. CompareScan,
+FlatnessScan, ExpansionScan, etc.).
 
----
+The focus is on robust, numerically stable geometry handling and reusable
+infrastructure for point-based measurements.
 
-## Contents
+===============================================================================
 
-### Points.h / Points.cpp
+POINTS
 
-**Points.h** defines the `Point` struct:
-- `std::string label` — point identifier (e.g. C1, H7, P12)
-- `double coords[3]` — X, Y, Z coordinates in millimeters
+The Points module defines a lightweight container and I/O helpers for CMM
+point data.
 
-**Points.cpp** implements:
-- `std::vector<Point> readPoints(const std::string& filename, int nExpected)`
+Each point consists of:
+  - a string label
+  - a vector of coordinates (coords)
 
-`readPoints()`:
-- Accepts both CSV and space-separated files  
-- Skips empty lines  
-- Reads optional labels  
-- Reads the first **three numeric fields** (X, Y, Z)  
-- Ignores extra fields  
-- Warns on malformed lines  
-- Warns if the number of points differs from `nExpected`  
-- Returns a clean `std::vector<Point>`
+The first three coordinates are interpreted as X, Y, Z in millimeters.
+Additional coordinates (if present) are preserved and propagated unchanged.
 
----
+Features:
+  - CSV-style input with flexible column count
+  - Consistent interpretation of XYZ coordinates
+  - Preservation of extra per-point data
+  - Shared implementation across all CMM tools
 
-## Purpose
+This module forms the foundation for all point-based operations in the CMM
+workflow.
 
-This repository is the **single source of truth** for point-reading and point-representation code used by all downstream analysis tools.  
-Centralizing this logic ensures:
-- stable behavior across all programs  
-- no duplicated code  
-- consistent handling of labels and coordinates  
-- easy maintenance  
+===============================================================================
 
----
+ROTOTRANSLATION
 
-## Usage
+The RotoTranslation module implements rigid 3D transformations (rotation
+plus translation) in a safe, explicit, and reusable form.
 
-Other repositories include this library via:
+A roto-translation is defined as:
 
-```cpp
-#include "../common/Points.h"
-```
+  p' = R · p + t
 
-Link with:
+where:
+  - R is a 3×3 orthonormal rotation matrix
+  - t is a 3D translation vector
 
-```bash
-../common/Points.o
-```
+This convention is used consistently throughout the code.
 
-Example:
+Design principles:
 
-```cpp
-std::vector<Point> pts = readPoints("myfile.csv", 3);
-```
+  - The rotation matrix R is the authoritative representation.
+    It is always stored, applied, and inverted directly.
 
----
+  - Euler angles (roll, pitch, yaw) are derived quantities.
+    They are provided only for input/output and human-readable diagnostics,
+    and are never used internally to apply transformations.
 
-## File Format
+  - The inverse transform is exact (up to floating-point precision):
 
-Each line should contain:
+        R⁻¹ = Rᵀ
+        t⁻¹ = −Rᵀ · t
 
-```
-LABEL   X   Y   Z   [optional extra fields...]
-```
+Features:
 
-Examples:
+  - Apply a transform to a single Point or to a vector<Point>
+  - In-place or copy-based application
+  - Exact inverse via matrix transpose
+  - Composition of transforms
+  - Euler ZYX helpers (roll–pitch–yaw), using the convention:
 
-```
-C14, 123.45, 67.89, -0.12
-P7   100.0  -50.0   0.00  extra data
-42   0   0   0
-```
+        R = Rz(yaw) · Ry(pitch) · Rx(roll)
 
-Commas or spaces accepted.  
-Extra fields ignored.
+  - Preservation of point labels and extra coordinates
 
----
+This abstraction eliminates common errors related to sign conventions,
+application order, and inverse transforms.
 
-## Versioning
+===============================================================================
 
-Repository uses annotated tags:
-- v1.0 — initial release  
-- v1.2.x — updated readPoints()  
-- v2.x — structural improvements and documentation  
+FITROTOTRANSLATION (RIGID ALIGNMENT)
 
----
+The FitRotoTranslation module computes the best rigid transformation between
+two corresponding 3D point clouds.
 
-## Development Notes
+The fit uses Horn’s closed-form quaternion solution for absolute orientation:
 
-- Only the first 3 numeric fields are used (X, Y, Z).  
-- Labels are optional and not validated.  
-- Extra fields allow forward-compatible extensions.  
-- No external dependencies: pure C++17, lightweight, and portable.  
+  B. K. P. Horn,
+  "Closed-form solution of absolute orientation using unit quaternions",
+  Journal of the Optical Society of America A, Vol. 4, No. 4,
+  pp. 629–642 (1987).
+  DOI: 10.1364/JOSAA.4.000629
 
----
+Properties:
 
-## Future Enhancements
+  - Least-squares optimal rigid fit
+  - Closed-form (non-iterative) solution
+  - Produces an orthonormal rotation matrix with determinant +1
+  - No reflections
+  - Numerically stable
 
-Optional future improvements:
-- support for quoted CSV  
-- support for comment lines (# or //)  
-- configurable column positions  
-- automatic label generation  
-- storing additional metadata  
+The result is returned as a RotoTranslation object, ensuring consistent and
+unambiguous use of the authoritative (R, t) representation.
 
----
+Output:
 
-## License
+  - Best-fit RotoTranslation
+  - RMS residual (in the same units as input coordinates)
+  - Number of points used in the fit
 
-Internal use — part of the CMM analysis ecosystem maintained by Luciano Ristori.
+===============================================================================
+
+TESTING
+
+Two complementary tests validate the implementation:
+
+1) Noiseless test
+   - Synthetic data with an exact known transform
+   - Validates correctness at machine precision (~1e−12)
+
+2) Noisy realistic test
+   - Random point cloud
+   - Random rigid transform
+   - Gaussian noise added independently to all coordinates
+   - Fit residuals analyzed via histograms of X, Y, Z differences
+
+These tests validate both mathematical correctness and statistical behavior
+under realistic measurement noise.
+
+===============================================================================
+
+INTENDED USAGE
+
+This repository is intended to be used as a shared dependency by multiple
+CMM analysis tools, providing:
+
+  - a single, trusted implementation of rigid transformations
+  - consistent point handling
+  - reproducible numerical behavior across projects
